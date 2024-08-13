@@ -199,12 +199,9 @@ class SpeechLLM(PreTrainedModel):
         attention_mask: Optional[torch.Tensor] = None,
         labels: Optional[torch.LongTensor] = None,
         mel: torch.LongTensor = None,
+        eos_token_id=None,
         decode_config=None,
     ):
-        device = next(self.parameters()).device
-        input_ids = input_ids.to(device)
-        attention_mask = attention_mask.to(device)
-        mel = mel.to(device)
         inputs_embeds = self.get_input_embedding(input_ids, mel)
         model_outputs = self.llm.generate(
             inputs_embeds=inputs_embeds,
@@ -213,7 +210,7 @@ class SpeechLLM(PreTrainedModel):
             top_p=1.0,
             num_beams=decode_config.num_beams,
             max_new_tokens=decode_config.max_new_tokens,
-            eos_token_id=[151643, 151645],
+            eos_token_id=eos_token_id,
         )
         return model_outputs
 
@@ -233,9 +230,6 @@ class SpeechLLM(PreTrainedModel):
 
 def init_model(model_args):
     encoder = whisper.load_model(model_args.whisper_model_name_or_path)
-    model_load_kwargs = {
-        "low_cpu_mem_usage": not deepspeed.is_deepspeed_zero3_enabled(),
-    }
     # Load llm model and tokenizer
     config = transformers.AutoConfig.from_pretrained(
         model_args.llm_model_name_or_path)
@@ -243,8 +237,7 @@ def init_model(model_args):
     llm_model = AutoModelForCausalLM.from_pretrained(
         model_args.llm_model_name_or_path,
         config=config,
-        device_map=None,
-        **model_load_kwargs,
+        torch_dtype='auto',
     )
     encoder_dim = encoder.dims.n_audio_state
     llm_dim = config.hidden_size
@@ -278,6 +271,7 @@ def main():
         model_max_length=training_args.model_max_length,
         padding_side="right",
     )
+    tokenizer.pad_token = tokenizer.eos_token  # for LLaMa
 
     print("Loading data...")
     train_dataset = SpeechDataset(data_args.data_path,
