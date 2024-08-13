@@ -194,7 +194,7 @@ def get_audio_data(file_name, tokenizer):
     mel = whisper.log_mel_spectrogram(audio)
     ids_audio = [0] * int(mel.shape[1] / 10)  # 10x downsample
     tgt_audio = [IGNORE_TOKEN_ID] * len(ids_audio)
-    chat = [{"role": "user", "content": "Trascribe the speech"}]
+    chat = [{"role": "user", "content": "Transcribe the speech"}]
     kwargs = {'add_generation_prompt': True}
     ids_text = tokenizer.apply_chat_template(chat, tokenize=True, **kwargs)
     ids = ids_audio + ids_text
